@@ -11,7 +11,7 @@
 :root{
   --bg:#E9ECEF; --panel:#F8F9FA; --ink:#15181C; --muted:#5A626C; --line:#CDD3DA;
   --stage:#0E1013; --a:#A9620C; --b:#2A58BA; --a-soft:#F4E6D3; --b-soft:#DCE5F7;
-  --warn:#8A5A00; --warn-bg:#FFF2D6; --focus:#2A58BA;
+  --warn:#8A5A00; --warn-bg:#FFF2D6; --focus:#2A58BA; --good:#1E7A45; --bad:#B23A2E;
   --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --sans:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --ar:1.7778;
@@ -21,14 +21,14 @@
     color-scheme:dark;
     --bg:#111316; --panel:#1A1D21; --ink:#E6E8EB; --muted:#98A0AA; --line:#2D3238;
     --stage:#050607; --a:#E3A456; --b:#86A6F2; --a-soft:#3A2A15; --b-soft:#1C2740;
-    --warn:#F2C46B; --warn-bg:#33280F; --focus:#86A6F2;
+    --warn:#F2C46B; --warn-bg:#33280F; --focus:#86A6F2; --good:#6FD39A; --bad:#F08A7E;
   }
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
   --bg:#111316; --panel:#1A1D21; --ink:#E6E8EB; --muted:#98A0AA; --line:#2D3238;
   --stage:#050607; --a:#E3A456; --b:#86A6F2; --a-soft:#3A2A15; --b-soft:#1C2740;
-  --warn:#F2C46B; --warn-bg:#33280F; --focus:#86A6F2;
+  --warn:#F2C46B; --warn-bg:#33280F; --focus:#86A6F2; --good:#6FD39A; --bad:#F08A7E;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -105,6 +105,27 @@ label.inline select,label.inline input{color:var(--ink)}
 kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);color:var(--ink)}
 .share{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .share input{flex:1;min-width:0;font-family:var(--mono);font-size:12px}
+
+.measure{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.measure h2{font-size:16px;font-weight:700;font-stretch:85%;margin:0}
+.mhead{display:flex;flex-direction:column;gap:2px}
+.mhead p{margin:0;max-width:70ch}
+.prog{flex:1 1 160px;height:6px;background:var(--bg);border:1px solid var(--line);border-radius:3px;overflow:hidden;min-width:80px}
+.prog div{height:100%;width:0;background:var(--ink)}
+.verdict{margin:0;font-size:15px;max-width:75ch}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;font-variant-numeric:tabular-nums;min-width:100%}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+td.num{font-family:var(--mono);text-align:right}
+th.num{text-align:right}
+td.good{color:var(--good);font-weight:600}
+td.bad{color:var(--bad);font-weight:600}
+td .sub{display:block;color:var(--muted);font-size:12px;white-space:normal}
+#mchart{width:100%;height:190px;display:block;cursor:pointer;background:var(--bg);border-radius:6px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.legend .la::before,.legend .lb::before{content:"";display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;background:currentColor}
+.legend .la{color:var(--a)} .legend .lb{color:var(--b)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 
@@ -209,6 +230,27 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
       </div>
     </div>
   </section>
+  <section class="measure" aria-label="Measurements">
+    <div class="mhead">
+      <h2>Measure</h2>
+      <p class="hint">Scores both clips frame by frame at the same size. Fine detail is how much sharp edge and texture each frame holds; flicker is how much still areas shimmer between frames. It judges the picture, not the performance, so still watch whether the action works.</p>
+    </div>
+    <div class="bar">
+      <button type="button" class="primary" id="mrun">Measure A vs B</button>
+      <label class="inline">Frames
+        <select id="mstep"><option value="1">Every frame</option><option value="2" selected>Every 2nd (faster)</option><option value="4">Every 4th (quick look)</option></select>
+      </label>
+      <button type="button" id="mstop" hidden>Stop</button>
+      <div class="prog" id="mprog" hidden><div id="mbar"></div></div>
+      <span class="fr" id="mstat"></span>
+    </div>
+    <div id="mout" hidden>
+      <p class="verdict" id="mverdict"></p>
+      <div class="tablewrap"><table id="mtable"><thead><tr><th>Check</th><th class="num">A</th><th class="num">B</th><th class="num">B vs A</th></tr></thead><tbody></tbody></table></div>
+      <div class="legend"><span class="la" id="lega">A</span><span class="lb" id="legb">B</span><span>Fine detail per frame · click to jump there</span></div>
+      <canvas id="mchart" aria-label="Fine detail per frame for both clips"></canvas>
+    </div>
+  </section>
   <p class="hint">Files stay on your computer; nothing is uploaded. Drop two clips on the picture to load both at once (first file goes to A).</p>
 </div>
 
@@ -218,6 +260,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
   const stage = $('stage');
   const state = { mode:'wipe', split:.5, zoom:1, panX:0, panY:0, panMode:false, fps:24, rate:1, loop:true, audio:'a', showA:false };
   const demoClock = { t:0, playing:false, last:0 };
+  let measuring = false, mStop = false, mResult = null;
   const slots = {};
   for (const k of ['a','b']) slots[k] = { k, kind:'empty', video:$('vid-'+k), canvas:$('cv-'+k), blob:null, url:null, name:'', w:0, h:0, dur:0, draw:null };
 
@@ -267,6 +310,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
   function getT() { const m = master(); return m.kind === 'video' ? m.video.currentTime : m.kind === 'demo' ? demoClock.t : 0; }
   function playing() { const m = master(); return m.kind === 'video' ? !m.video.paused && !m.video.ended : m.kind === 'demo' && demoClock.playing; }
   function play() {
+    if (measuring) return;
     const m = master(); if (!live(m)) return;
     if (getT() >= duration() - 0.5/state.fps) seek(0);
     if (m.kind === 'video') { m.video.playbackRate = state.rate; m.video.play().catch(()=>{}); }
@@ -324,6 +368,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
     if (s.blob) URL.revokeObjectURL(s.blob);
     s.blob = isFile ? src : null; s.url = isFile ? null : src; s.name = name;
     s.kind = 'loading'; s.dur = 0;
+    mResult = null; $('mout').hidden = true; $('mstat').textContent = '';
     const info = $('info-'+k); info.classList.remove('err'); info.textContent = 'Loading ' + name + '…';
     const v = s.video;
     v.onloadedmetadata = () => {
@@ -379,6 +424,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
     $('tc').textContent = tc(t);
     $('fr').textContent = `frame ${Math.floor(t*state.fps + 1e-6)} / ${Math.max(0, Math.round(d*state.fps) - 1)}`;
     const r = $('seek'); r.max = d || 1; if (document.activeElement !== r || !scrubbing) r.value = t;
+    if (mResult && !measuring) drawChart();
   }
   function paintTags() {
     for (const k of ['a','b']) {
@@ -511,6 +557,198 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
     else if (e.key === '3') setMode('ab');
     else if (e.key === 'x' || e.key === 'X') { if (state.mode !== 'ab') setMode('ab'); flip(); }
   });
+
+
+  // ---------- measurement (same checks as the MiniMax pass tests)
+  function boxPass(src, dst, W, H, r, horiz) {
+    const n = 2*r + 1;
+    if (horiz) {
+      for (let y = 0; y < H; y++) {
+        const o = y*W; let acc = 0;
+        for (let i = -r; i <= r; i++) acc += src[o + Math.min(W-1, Math.max(0, i))];
+        for (let x = 0; x < W; x++) {
+          dst[o+x] = acc/n;
+          acc += src[o + Math.min(W-1, x+r+1)] - src[o + Math.max(0, x-r)];
+        }
+      }
+    } else {
+      for (let x = 0; x < W; x++) {
+        let acc = 0;
+        for (let i = -r; i <= r; i++) acc += src[Math.min(H-1, Math.max(0, i))*W + x];
+        for (let y = 0; y < H; y++) {
+          dst[y*W+x] = acc/n;
+          acc += src[Math.min(H-1, y+r+1)*W + x] - src[Math.max(0, y-r)*W + x];
+        }
+      }
+    }
+  }
+  function blur(g, W, H, tmp, out) { // three box passes ≈ Gaussian, sigma ≈ 3.5 px
+    let a = g, b = tmp;
+    for (let k = 0; k < 3; k++) { boxPass(a, b, W, H, 3, true); boxPass(b, out, W, H, 3, false); a = out; }
+    return out;
+  }
+  function seekVideo(v, t) {
+    return new Promise((res, rej) => {
+      if (Math.abs(v.currentTime - t) < 1e-4 && v.readyState >= 2) return res();
+      const done = () => { clearTimeout(to); v.removeEventListener('seeked', done); res(); };
+      const to = setTimeout(() => { v.removeEventListener('seeked', done); rej(new Error('seek timeout')); }, 8000);
+      v.addEventListener('seeked', done); v.currentTime = t;
+    });
+  }
+  function newAcc(N) { return { prev:null, sumDiff:new Float32Array(N), frames:[], pairs:0 }; }
+  async function grab(s, t, ctx, W, H) {
+    if (s.kind === 'video') { await seekVideo(s.video, Math.min(t, s.dur - 0.001)); ctx.drawImage(s.video, 0, 0, W, H); }
+    else { s.draw(t); ctx.drawImage(s.canvas, 0, 0, W, H); }
+    const d = ctx.getImageData(0, 0, W, H).data; // throws SecurityError for links whose server blocks reading
+    const g = new Float32Array(W*H);
+    for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = 0.299*d[j] + 0.587*d[j+1] + 0.114*d[j+2];
+    return g;
+  }
+  function score(acc, g, W, H, f, tmp, out) {
+    const N = g.length; let sum = 0, sq = 0;
+    for (let i = 0; i < N; i++) { sum += g[i]; sq += g[i]*g[i]; }
+    const mean = sum/N, std = Math.sqrt(Math.max(1e-6, sq/N - mean*mean));
+    const bl = blur(g, W, H, tmp, out); let lc = 0;
+    for (let i = 0; i < N; i++) lc += Math.abs(g[i] - bl[i]);
+    lc /= N;
+    let motion = null;
+    if (acc.prev) { let m = 0; for (let i = 0; i < N; i++) { const dd = Math.abs(g[i] - acc.prev[i]); m += dd; acc.sumDiff[i] += dd; } motion = m/N; acc.pairs++; }
+    acc.prev = g;
+    acc.frames.push({ f, lc, lcn: lc*50/std, motion, mean, std });
+  }
+  function summarize(acc) {
+    const fr = acc.frames, avg = (arr, k) => arr.reduce((a, x) => a + x[k], 0)/Math.max(1, arr.length);
+    const moving = fr.filter(x => x.motion !== null).sort((p, q) => p.motion - q.motion);
+    const calm = moving.slice(0, Math.max(1, Math.round(moving.length/4)));
+    let flicker = null;
+    if (acc.pairs > 0) {
+      const md = acc.sumDiff, samp = [];
+      for (let i = 0; i < md.length; i += 7) samp.push(md[i]);
+      samp.sort((p, q) => p - q); const thr = samp[Math.floor(samp.length*0.3)];
+      let s = 0, c = 0; for (let i = 0; i < md.length; i++) if (md[i] <= thr) { s += md[i]; c++; }
+      flicker = c ? s/c/acc.pairs : null;
+    }
+    return { lc:avg(fr,'lc'), lcn:avg(fr,'lcn'), calm:avg(calm,'lc'), motion:moving.length ? avg(moving,'motion') : null, flicker, mean:avg(fr,'mean'), std:avg(fr,'std') };
+  }
+  function setMStatus(t) { $('mstat').textContent = t; }
+  async function measure() {
+    const A = slots.a, B = slots.b;
+    if (!live(A) || !live(B)) { setMStatus('Load two clips first.'); return; }
+    pause(); const t0 = getT();
+    measuring = true; mStop = false;
+    $('mrun').disabled = true; $('mstop').hidden = false; $('mprog').hidden = false; $('mbar').style.width = '0%';
+    const fps = state.fps, dur = Math.min(A.dur, B.dur), n = Math.max(1, Math.floor(dur*fps + 1e-6)), step = +$('mstep').value;
+    const ar = (master().w || 16) / (master().h || 9);
+    let W = Math.min(688, A.w || 688, B.w || 688); W -= W % 2; const H = Math.max(2, Math.round(W/ar));
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d', { willReadFrequently:true });
+    const acc = { a:newAcc(W*H), b:newAcc(W*H) }, tmp = new Float32Array(W*H), out = new Float32Array(W*H);
+    const total = Math.ceil(n/step); let done = 0, error = null;
+    try {
+      for (let f = 0; f < n; f += step) {
+        if (mStop) break;
+        const t = f/fps + 0.0005;
+        for (const k of ['a','b']) score(acc[k], await grab(slots[k], t, ctx, W, H), W, H, f, tmp, out);
+        done++;
+        $('mbar').style.width = (100*done/total).toFixed(1) + '%';
+        setMStatus(`Measuring frame ${f} of ${n-1}…`);
+        if (done % 4 === 0) await new Promise(r => setTimeout(r, 0));
+      }
+    } catch (e) { error = e; }
+    measuring = false; $('mrun').disabled = false; $('mstop').hidden = true; $('mprog').hidden = true;
+    seek(t0);
+    if (error) {
+      setMStatus(error.name === 'SecurityError'
+        ? 'This link’s server doesn’t allow the page to read its pixels, so it can’t be measured. Download the clip and load it from your computer instead.'
+        : 'Measuring stopped: ' + (error.message || 'a clip could not be read') + '.');
+      return;
+    }
+    if (acc.a.frames.length < 2) { setMStatus('Stopped before there was enough to measure.'); return; }
+    const sa = summarize(acc.a), sb = summarize(acc.b);
+    const fa = acc.a.frames, fb = acc.b.frames; let bWins = 0;
+    for (let i = 0; i < Math.min(fa.length, fb.length); i++) if (fb[i].lc > fa[i].lc) bWins++;
+    mResult = { sa, sb, fa, fb, bWins, count:Math.min(fa.length, fb.length), W, H, dur, partial:mStop, step };
+    setMStatus(`${mStop ? 'Stopped early: ' : ''}${mResult.count} frames per clip, measured at ${W}×${H}.`);
+    paintResults();
+  }
+  $('mrun').onclick = () => { measure(); };
+  $('mstop').onclick = () => { mStop = true; };
+
+  const pctTxt = (b, a) => a ? `${b >= a ? '+' : '−'}${Math.abs((b/a - 1)*100).toFixed(1)}%` : '—';
+  function paintResults() {
+    const r = mResult; if (!r) return;
+    const la = $('label-a').value.trim() || 'A', lb = $('label-b').value.trim() || 'B';
+    $('lega').textContent = 'A · ' + la; $('legb').textContent = 'B · ' + lb;
+    const rows = [
+      ['Fine detail', 'all measured frames', r.sa.lc, r.sb.lc, 'up', 2],
+      ['Fine detail, tone evened out', 'with brightness and contrast matched', r.sa.lcn, r.sb.lcn, 'up', 2],
+      ['Fine detail, calmest quarter', 'frames with the least movement', r.sa.calm, r.sb.calm, 'up', 2],
+      ['Flicker in still areas', 'lower is steadier', r.sa.flicker, r.sb.flicker, 'down', 2],
+      ['Amount of motion', 'more motion adds blur', r.sa.motion, r.sb.motion, 'none', 2],
+      ['Brightness', 'average, 0 to 255', r.sa.mean, r.sb.mean, 'none', 1],
+      ['Contrast', 'spread of tones', r.sa.std, r.sb.std, 'none', 1],
+    ];
+    const tb = $('mtable').tBodies[0]; tb.innerHTML = '';
+    for (const [name, sub, a, b, dir] of rows) {
+      const tr = document.createElement('tr');
+      const td0 = document.createElement('td'); td0.textContent = name; const sp = document.createElement('span'); sp.className = 'sub'; sp.textContent = sub; td0.appendChild(sp); tr.appendChild(td0);
+      for (const v of [a, b]) { const td = document.createElement('td'); td.className = 'num'; td.textContent = v == null ? '—' : v.toFixed(2); tr.appendChild(td); }
+      const td = document.createElement('td'); td.className = 'num';
+      if (a != null && b != null) {
+        td.textContent = pctTxt(b, a);
+        const better = dir === 'up' ? b > a*1.02 : dir === 'down' ? b < a*0.98 : null;
+        const worse = dir === 'up' ? b < a*0.98 : dir === 'down' ? b > a*1.02 : null;
+        if (better) td.classList.add('good'); else if (worse) td.classList.add('bad');
+      } else td.textContent = '—';
+      tr.appendChild(td); tb.appendChild(tr);
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>B sharper than A<span class="sub">frame by frame</span></td><td class="num"></td><td class="num"></td><td class="num"></td>';
+    tr.cells[3].textContent = `${r.bWins} / ${r.count}`; tb.appendChild(tr);
+    // verdict in plain words
+    const d = (r.sb.lc/r.sa.lc - 1)*100, dn = (r.sb.lcn/r.sa.lcn - 1)*100;
+    const lead = Math.abs(d) < 3 ? `${la} and ${lb} hold about the same fine detail` :
+      d > 0 ? `${lb} has ${d.toFixed(0)}% more fine detail than ${la}` : `${la} has ${(-d/(1+d/100)).toFixed(0)}% more fine detail than ${lb}`;
+    let tone = Math.abs(d) >= 3 ? ` (${Math.abs(dn).toFixed(0)}% once brightness and contrast are matched)` : '';
+    let fl = '';
+    if (r.sa.flicker && r.sb.flicker) { const df = (r.sb.flicker/r.sa.flicker - 1)*100; fl = Math.abs(df) < 5 ? ', with similar flicker' : df < 0 ? `, and ${lb} flickers ${(-df).toFixed(0)}% less` : `, and ${lb} flickers ${df.toFixed(0)}% more`; }
+    $('mverdict').textContent = `${lead}${tone}${fl}. ${lb} is sharper on ${r.bWins} of ${r.count} frames.` + (r.step > 1 ? ` Every ${r.step === 2 ? '2nd' : r.step + 'th'} frame was measured.` : '');
+    $('mout').hidden = false; drawChart();
+  }
+  function drawChart() {
+    const r = mResult; if (!r || $('mout').hidden) return;
+    const c = $('mchart'), dpr = window.devicePixelRatio || 1, cw = c.clientWidth, ch = c.clientHeight;
+    if (!cw) return;
+    c.width = Math.round(cw*dpr); c.height = Math.round(ch*dpr);
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, cw, ch);
+    const css = getComputedStyle(document.documentElement), col = n => css.getPropertyValue(n).trim();
+    const pad = { l:40, r:10, t:10, b:22 }, pw = cw - pad.l - pad.r, ph = ch - pad.t - pad.b;
+    const all = r.fa.map(x => x.lc).concat(r.fb.map(x => x.lc));
+    let lo = Math.min(...all), hi = Math.max(...all); const span = (hi - lo) || 1; lo -= span*0.08; hi += span*0.08;
+    const X = t => pad.l + pw*t/r.dur, Y = v => pad.t + ph*(1 - (v - lo)/(hi - lo));
+    g.strokeStyle = col('--line'); g.lineWidth = 1; g.fillStyle = col('--muted'); g.font = '11px ' + col('--mono');
+    g.textBaseline = 'middle'; g.textAlign = 'right';
+    for (let i = 0; i <= 3; i++) { const v = lo + (hi - lo)*i/3, y = Y(v); g.beginPath(); g.moveTo(pad.l, y); g.lineTo(cw - pad.r, y); g.stroke(); g.fillText(v.toFixed(1), pad.l - 6, y); }
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    const stepS = r.dur > 20 ? 5 : r.dur > 6 ? 2 : 1;
+    for (let s = 0; s <= r.dur + 1e-6; s += stepS) g.fillText(s + 's', X(s), ch - pad.b + 5);
+    for (const [arr, name] of [[r.fa, '--a'], [r.fb, '--b']]) {
+      g.strokeStyle = col(name); g.lineWidth = 2; g.beginPath();
+      arr.forEach((p, i) => { const x = X(p.f/state.fps), y = Y(p.lc); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+      g.stroke();
+    }
+    const t = getT(); if (t <= r.dur) { g.strokeStyle = col('--ink'); g.lineWidth = 1; g.beginPath(); g.moveTo(X(t), pad.t); g.lineTo(X(t), pad.t + ph); g.stroke(); }
+    c._x = X; c._pad = pad; c._pw = pw;
+  }
+  $('mchart').addEventListener('click', e => {
+    const r = mResult, c = $('mchart'); if (!r) return;
+    const rect = c.getBoundingClientRect(), x = e.clientX - rect.left;
+    const t = Math.max(0, Math.min(r.dur, (x - c._pad.l)/c._pw*r.dur));
+    pause(); seek(Math.round(t*state.fps)/state.fps + 0.0005);
+  });
+  window.addEventListener('resize', () => drawChart());
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => drawChart()); } catch (e) {}
+  new MutationObserver(() => drawChart()).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
 
   // ---------- start: links from ?a=&b= (GitHub Pages), otherwise the sample pair
   let params; try { params = new URLSearchParams(location.search); } catch (e) { params = new URLSearchParams(); }
