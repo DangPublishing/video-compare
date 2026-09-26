@@ -262,7 +262,7 @@ td .sub{display:block;color:var(--muted);font-size:12px;white-space:normal}
   const demoClock = { t:0, playing:false, last:0 };
   let measuring = false, mStop = false, mResult = null;
   const slots = {};
-  for (const k of ['a','b']) slots[k] = { k, kind:'empty', video:$('vid-'+k), canvas:$('cv-'+k), blob:null, url:null, name:'', w:0, h:0, dur:0, draw:null };
+  for (const k of ['a','b']) slots[k] = { k, autoLabel:'', kind:'empty', video:$('vid-'+k), canvas:$('cv-'+k), blob:null, url:null, name:'', w:0, h:0, dur:0, draw:null };
 
   // ---------- sample clips (drawn live, so the page works before anything is loaded)
   function makeDemo(canvas, soft) {
@@ -367,13 +367,17 @@ td .sub{display:block;color:var(--muted);font-size:12px;white-space:normal}
     clearDemos(); pause();
     if (s.blob) URL.revokeObjectURL(s.blob);
     s.blob = isFile ? src : null; s.url = isFile ? null : src; s.name = name;
+    if (isFile) $('url-'+k).value = '';
     s.kind = 'loading'; s.dur = 0;
     mResult = null; $('mout').hidden = true; $('mstat').textContent = '';
     const info = $('info-'+k); info.classList.remove('err'); info.textContent = 'Loading ' + name + '…';
     const v = s.video;
     v.onloadedmetadata = () => {
       s.kind = 'video'; s.w = v.videoWidth; s.h = v.videoHeight; s.dur = v.duration || 0;
-      const lab = $('label-'+k); if (!lab.value.trim()) lab.value = prettyName(name);
+      const lab = $('label-'+k), auto = prettyName(name);
+      // Replace the label when it is empty or still the name we filled in for the previous clip; keep a label the user typed.
+      if (!lab.value.trim() || lab.value === s.autoLabel) { lab.value = auto; s.autoLabel = auto; }
+      paintTags();
       info.textContent = describe(s);
       refresh(); seek(0);
     };
