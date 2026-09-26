@@ -151,12 +151,12 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
     <div class="stagebox">
       <div class="stage" id="stage" data-mode="wipe" style="--split:.5">
         <div class="view" id="view-a"><div class="frame" id="frame-a">
-          <video id="vid-a" playsinline muted preload="auto"></video>
+          <video id="vid-a" playsinline preload="auto"></video>
           <canvas id="cv-a" width="1280" height="720"></canvas>
           <div class="empty" id="empty-a">Load clip A</div>
         </div></div>
         <div class="view" id="view-b"><div class="frame" id="frame-b">
-          <video id="vid-b" playsinline muted preload="auto"></video>
+          <video id="vid-b" playsinline preload="auto"></video>
           <canvas id="cv-b" width="1280" height="720"></canvas>
           <div class="empty" id="empty-b">Load clip B</div>
         </div></div>
@@ -407,6 +407,14 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
       if (Math.abs(a.dur - b.dur) > 1/state.fps) out.push(`Lengths differ: A is ${a.dur.toFixed(2)} s, B is ${b.dur.toFixed(2)} s. The shorter clip holds its last frame.`);
       if (a.w && b.w && (a.w !== b.w || a.h !== b.h)) out.push(`Sizes differ: A is ${a.w}×${a.h}, B is ${b.w}×${b.h}. Both are scaled to fit the same frame, so fine detail is not pixel-for-pixel.`);
     }
+    const pick = state.audio === 'off' ? null : slots[state.audio];
+    if (pick && pick.kind === 'video') {
+      const h = hasAudio(pick);
+      if (h === false) out.push(`Clip ${pick.k.toUpperCase()} has no sound track. ComfyUI's video save writes two files per clip: load the one ending in -audio.mp4.`);
+    } else if (pick && pick.kind === 'demo') out.push('The sample clips are silent. Load your own clips to hear them.');
+    const html = out.join('\u0001');
+    if ($('notes').dataset.last === html) return;
+    $('notes').dataset.last = html;
     $('notes').innerHTML = ''; for (const t of out) { const d = document.createElement('div'); d.className = 'note'; d.textContent = t; $('notes').appendChild(d); }
   }
   function paintShare() {
@@ -421,9 +429,18 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
     navigator.clipboard?.writeText(i.value).then(() => { $('copyshare').textContent = 'Copied'; setTimeout(() => $('copyshare').textContent = 'Copy link', 1500); }).catch(() => { i.select(); });
   };
   function applyAudio() {
-    slots.a.video.muted = state.audio !== 'a';
-    slots.b.video.muted = state.audio !== 'b';
+    for (const k of ['a','b']) { const v = slots[k].video, m = state.audio !== k; v.defaultMuted = m; v.muted = m; v.volume = 1; }
+    paintNotes();
   }
+  // Report a clip with no sound track (Chrome/Edge expose a decoded-audio counter, Firefox a flag).
+  function hasAudio(s) {
+    const v = s.video;
+    if (typeof v.mozHasAudio === 'boolean') return v.mozHasAudio;
+    if (v.audioTracks && typeof v.audioTracks.length === 'number') return v.audioTracks.length > 0;
+    if (typeof v.webkitAudioDecodedByteCount === 'number') return v.currentTime < 0.5 ? null : v.webkitAudioDecodedByteCount > 0;
+    return null;
+  }
+  setInterval(() => { if (slots.a.kind === 'video' || slots.b.kind === 'video') paintNotes(); }, 1000);
 
   // ---------- modes, zoom, pan, wipe
   function setMode(m) {
